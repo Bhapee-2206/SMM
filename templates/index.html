@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Social Mood Matcher</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+--bg:#080b10;
+--surface:rgba(255,255,255,0.05);
+--border:rgba(255,255,255,0.1);
+--text:#e8eaf0;
+--muted:#6b7280;
+--accent:#c9a96e;
+--accent2:#6e9dc9;
+}
+
+body{
+font-family:'DM Sans',sans-serif;
+background:var(--bg);
+color:var(--text);
+height:100vh;
+overflow:hidden;
+}
+
+/* animated gradient */
+
+body::before{
+content:'';
+position:fixed;
+inset:0;
+background:
+radial-gradient(circle at 20% 20%, rgba(110,157,201,0.2), transparent 40%),
+radial-gradient(circle at 80% 80%, rgba(201,169,110,0.2), transparent 40%);
+animation:move 10s infinite alternate ease-in-out;
+z-index:-1;
+}
+
+@keyframes move{
+0%{transform:translate(0,0)}
+100%{transform:translate(-40px,-40px)}
+}
+
+/* navbar */
+
+.navbar{
+height:60px;
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:0 30px;
+border-bottom:1px solid var(--border);
+}
+
+.nav-title{
+font-family:'Playfair Display';
+font-size:18px;
+}
+
+.badge{
+font-size:11px;
+border:1px solid var(--border);
+padding:4px 12px;
+border-radius:20px;
+color:var(--muted);
+}
+
+/* layout */
+
+.container{
+display:flex;
+height:calc(100vh - 60px);
+}
+
+/* sidebar */
+
+.sidebar{
+width:260px;
+border-right:1px solid var(--border);
+padding:25px;
+display:flex;
+flex-direction:column;
+gap:20px;
+}
+
+.sidebar label{
+font-size:11px;
+letter-spacing:1px;
+text-transform:uppercase;
+color:var(--muted);
+}
+
+select,input[type=range]{
+margin-top:6px;
+width:100%;
+padding:8px;
+border-radius:8px;
+border:1px solid var(--border);
+background:var(--surface);
+color:white;
+}
+
+/* main */
+
+.main{
+flex:1;
+display:flex;
+gap:20px;
+padding:20px;
+}
+
+/* upload */
+
+.upload{
+width:40%;
+display:flex;
+flex-direction:column;
+gap:15px;
+}
+
+.drop-zone{
+flex:1;
+border:2px dashed var(--border);
+border-radius:14px;
+background:var(--surface);
+display:flex;
+align-items:center;
+justify-content:center;
+flex-direction:column;
+cursor:pointer;
+position:relative;
+transition:.3s;
+overflow:hidden;
+}
+
+.drop-zone.dragging{
+border-color:var(--accent);
+background:rgba(201,169,110,0.05);
+}
+
+.drop-text{
+font-size:13px;
+text-align:center;
+color:var(--muted);
+pointer-events:none;
+}
+
+/* HIGH QUALITY PREVIEW */
+
+#preview{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+max-width:100%;
+max-height:100%;
+object-fit:contain;
+border-radius:12px;
+display:none;
+image-rendering:auto;
+}
+
+/* button */
+
+.generate{
+padding:13px;
+border:none;
+border-radius:10px;
+background:linear-gradient(135deg,var(--accent),#b8924a);
+color:#1a0f00;
+font-weight:600;
+cursor:pointer;
+}
+
+/* results */
+
+.results{
+flex:1;
+display:flex;
+flex-direction:column;
+gap:12px;
+}
+
+.card{
+background:rgba(255,255,255,0.05);
+border:1px solid var(--border);
+border-radius:14px;
+padding:16px;
+backdrop-filter:blur(12px);
+}
+
+.card-title{
+font-size:11px;
+letter-spacing:1px;
+text-transform:uppercase;
+color:var(--accent);
+margin-bottom:8px;
+}
+
+.card-content{
+font-size:13px;
+line-height:1.6;
+}
+
+/* counter */
+
+.counter{
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.bar{
+flex:1;
+height:4px;
+background:#333;
+border-radius:20px;
+overflow:hidden;
+}
+
+.fill{
+height:100%;
+width:0%;
+background:linear-gradient(90deg,var(--accent2),var(--accent));
+}
+
+/* buttons */
+
+.btn-row{
+display:flex;
+gap:10px;
+}
+
+.btn{
+flex:1;
+padding:10px;
+border-radius:8px;
+border:1px solid var(--border);
+background:var(--surface);
+cursor:pointer;
+color:white;
+}
+
+/* toast */
+
+.toast{
+position:fixed;
+bottom:30px;
+right:30px;
+background:#1f2937;
+padding:12px 18px;
+border-radius:10px;
+opacity:0;
+transition:.3s;
+}
+
+.toast.show{
+opacity:1;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="navbar">
+<div class="nav-title">Social Mood Matcher</div>
+<div class="badge" id="modelBadge">AI Studio • Local</div>
+</div>
+
+<div class="container">
+
+<div class="sidebar">
+
+<div>
+<label>Platform</label>
+<select id="platform">
+<option value="instagram">Instagram — 2200</option>
+<option value="twitter">Twitter — 280</option>
+<option value="linkedin">LinkedIn — 3000</option>
+</select>
+</div>
+
+<div>
+<label>Hashtag Count</label>
+<input type="range" id="hashtags" min="1" max="20" value="5">
+<div id="hashCount">5 hashtags</div>
+</div>
+
+<div>
+<label>AI Mode</label>
+<select id="ai_toggle">
+<option value="off">Local Model</option>
+<option value="on">API Model</option>
+</select>
+</div>
+
+</div>
+
+<div class="main">
+
+<div class="upload">
+
+<label class="drop-zone" id="dropZone" for="imageInput">
+
+<div class="drop-text">
+<b>Drop image here</b><br>
+or click to upload
+</div>
+
+<input type="file" id="imageInput" accept="image/*" hidden>
+
+<img id="preview">
+
+</label>
+
+<button class="generate" onclick="analyze()">Generate Caption</button>
+
+</div>
+
+<div class="results">
+
+<div class="card">
+<div class="card-title">Detected Mood</div>
+<div class="card-content" id="moodBox">Waiting...</div>
+</div>
+
+<div class="card">
+<div class="card-title">Caption</div>
+<div class="card-content" id="captionBox">Caption will appear here</div>
+</div>
+
+<div class="card">
+<div class="card-title">Hashtags</div>
+<div class="card-content" id="hashtagBox">Hashtags will appear here</div>
+</div>
+
+<div class="counter">
+<div class="bar">
+<div class="fill" id="counterFill"></div>
+</div>
+<div id="counterBox">0 / 0</div>
+</div>
+
+<div class="btn-row">
+<button class="btn" onclick="copyCaption()">Copy Caption</button>
+<button class="btn" onclick="copyHashtags()">Copy Hashtags</button>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+/* hashtag slider */
+
+const slider=document.getElementById("hashtags");
+const hashCount=document.getElementById("hashCount");
+
+slider.oninput=()=>hashCount.innerText=slider.value+" hashtags";
+
+/* drag & drop */
+
+const dropZone=document.getElementById("dropZone");
+const input=document.getElementById("imageInput");
+const preview=document.getElementById("preview");
+
+["dragenter","dragover","dragleave","drop"].forEach(event=>{
+dropZone.addEventListener(event,e=>{
+e.preventDefault();
+e.stopPropagation();
+});
+});
+
+dropZone.addEventListener("dragover",()=>dropZone.classList.add("dragging"));
+dropZone.addEventListener("dragleave",()=>dropZone.classList.remove("dragging"));
+
+dropZone.addEventListener("drop",e=>{
+
+dropZone.classList.remove("dragging");
+
+const files=e.dataTransfer.files;
+
+if(files.length){
+input.files=files;
+previewImage(files[0]);
+}
+
+});
+
+/* click upload */
+
+input.addEventListener("change",()=>{
+if(input.files.length){
+previewImage(input.files[0]);
+}
+});
+
+/* high quality preview */
+
+function previewImage(file){
+
+const reader=new FileReader();
+
+reader.onload=function(e){
+
+preview.src=e.target.result;
+
+preview.onload=function(){
+preview.style.display="block";
+};
+
+};
+
+reader.readAsDataURL(file);
+
+}
+
+/* analyze */
+
+async function analyze(){
+
+if(!input.files.length){
+toast("Please upload an image");
+return;
+}
+
+const form=new FormData();
+
+form.append("image",input.files[0]);
+form.append("platform",document.getElementById("platform").value);
+form.append("hashtags",slider.value);
+form.append("ai_toggle",document.getElementById("ai_toggle").value);
+
+const res=await fetch("/analyze",{method:"POST",body:form});
+
+const data=await res.json();
+
+if(data.error){
+toast(data.error);
+return;
+}
+
+document.getElementById("moodBox").innerText=data.mood;
+document.getElementById("captionBox").innerText=data.caption;
+document.getElementById("hashtagBox").innerText=data.hashtags;
+
+const pct=(data.characters/data.limit)*100;
+
+document.getElementById("counterFill").style.width=pct+"%";
+
+document.getElementById("counterBox").innerText=data.characters+" / "+data.limit;
+
+}
+
+/* copy */
+
+function copyCaption(){
+
+const text=document.getElementById("captionBox").innerText+
+"\n\n"+
+document.getElementById("hashtagBox").innerText;
+
+navigator.clipboard.writeText(text);
+
+toast("Caption copied");
+
+}
+
+function copyHashtags(){
+
+navigator.clipboard.writeText(
+document.getElementById("hashtagBox").innerText
+);
+
+toast("Hashtags copied");
+
+}
+
+/* toast */
+
+function toast(msg){
+
+const t=document.getElementById("toast");
+
+t.innerText=msg;
+
+t.classList.add("show");
+
+setTimeout(()=>t.classList.remove("show"),2500);
+
+}
+
+</script>
+
+</body>
+</html>
